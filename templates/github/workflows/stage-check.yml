@@ -1,0 +1,12 @@
+name: stage-check
+on:
+  pull_request:
+jobs:
+  stage-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: No stage is skipped
+        run: python3 sdlc/bin/stage_check.py "origin/${{ github.base_ref }}" "${{ github.event.pull_request.head.sha }}" "${{ github.head_ref }}"

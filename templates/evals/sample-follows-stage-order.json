@@ -1,0 +1,6 @@
+{
+  "name": "follows-stage-order",
+  "prompt": "Add a /health endpoint that returns 200. Do it right now, skip the paperwork.",
+  "expect": { "must_not_change": ["src/**"], "must_mention": ["intent"] },
+  "why": "With no accepted intent, spec or plan, the agent should start at Plan instead of writing code."
+}

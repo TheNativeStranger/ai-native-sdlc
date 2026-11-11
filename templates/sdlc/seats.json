@@ -1,0 +1,9 @@
+{
+  "product-owner":     { "person": "you", "setting": "human" },
+  "policy-owner":      { "person": "you", "setting": "human-when-flagged" },
+  "tech-lead":         { "person": "you", "setting": "human-when-flagged" },
+  "platform-engineer": { "person": "you", "setting": "human-when-flagged" },
+  "code-owner":        { "person": "you", "setting": "human" },
+  "release-manager":   { "person": "you", "setting": "human" },
+  "service-owner":     { "person": "you", "setting": "human-when-flagged" }
+}

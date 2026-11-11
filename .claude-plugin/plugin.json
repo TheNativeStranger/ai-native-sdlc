@@ -1,0 +1,7 @@
+{
+  "name": "ai-native-sdlc",
+  "version": "0.1.0",
+  "description": "A six-stage software lifecycle for Claude Code: intent, spec, plan, test, review and release, with role agents, approval seats and gates that hold. An independent implementation of the method described in The AI-native SDLC playbook.",
+  "license": "MIT",
+  "keywords": ["sdlc", "spec", "plan", "review", "hooks", "gates"]
+}

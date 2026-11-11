@@ -1,0 +1,8 @@
+{
+  "name": "ai-native-sdlc-local",
+  "owner": { "name": "ai-native-sdlc" },
+  "metadata": { "description": "Local marketplace for the ai-native-sdlc plugin." },
+  "plugins": [
+    { "name": "ai-native-sdlc", "source": "./", "version": "0.1.0", "description": "A six-stage software lifecycle for Claude Code with role agents, approval seats and gates." }
+  ]
+}

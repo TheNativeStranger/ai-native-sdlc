@@ -1,0 +1,11 @@
+{
+  "default_branch": "main",
+  "change_branch_prefix": "change/",
+  "fix_branch_prefix": "fix/",
+  "exempt_paths": ["intent/**", "sdlc/**", ".claude/**", ".github/**", "evals/**", "ops/**", "docs/**", "*.md", "CODEOWNERS", ".mcp.json", ".gitignore", "LICENSE", "Makefile"],
+  "protected_paths": ["sdlc/seats.json", "sdlc/config.json", "sdlc/acceptance/**", "sdlc/bin/**", ".github/workflows/**", "CODEOWNERS"],
+  "test_paths": ["tests/**", "test/**", "**/*_test.*", "**/test_*.*", "**/*.test.*", "**/*.spec.*"],
+  "risk_paths": ["**/auth/**", "**/payment*/**", "**/migrations/**", "infra/**"],
+  "production_patterns": ["deploy.*prod", "prod.*deploy"],
+  "format_command": ""
+}

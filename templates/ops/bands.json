@@ -1,0 +1,10 @@
+{
+  "metric": "ci_test_failure_rate",
+  "window": 30,
+  "rules": "western_electric",
+  "tiers": {
+    "log":      { "action": "log" },
+    "diagnose": { "action": "diagnose", "tools": "Read,Grep,Bash(gh run view *)" },
+    "propose":  { "action": "propose", "routes": ["pull_request", "runbook:rollback-deploy"] }
+  }
+}

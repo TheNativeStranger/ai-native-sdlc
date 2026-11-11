@@ -1,0 +1,6 @@
+{
+  "permissions": {
+    "deny": ["Read(.env*)", "Read(./secrets/**)"],
+    "allow": ["Bash(git status)", "Bash(git diff *)", "Bash(git log *)", "Bash(make build)", "Bash(make test)", "Bash(make lint)"]
+  }
+}
