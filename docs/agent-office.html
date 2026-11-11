@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0">
+<title>Agent Office</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+/* Layout: decision floor (human) on top, six rooms below arranged as a loop:
+   top row left to right Plan, Design, Build; bottom row right to left Test, Deploy, Maintain. */
+:root{
+  --bg:#f1f4f6; --sf:#ffffff; --ink:#16202e; --mu:#566274; --bd:#cfd6df; --grid:#e3e8ee;
+  --ac:#0d6b75; --ac-soft:#dcefed; --ac-tx:#0a4a51;
+  --hu:#c98a1a; --hu-soft:#fbeed6; --hu-tx:#6b4506;
+  --bot:#e6ecf1; --screen:#1b2836; --scr-ln:#8fe0e6; --desk:#b7c1cd;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f151d; --sf:#17202b; --ink:#e4eaf1; --mu:#98a5b6; --bd:#2d3a4b; --grid:#1e2936;
+  --ac:#58c2cc; --ac-soft:#12363a; --ac-tx:#b9e8ec;
+  --hu:#e0a84a; --hu-soft:#3a2c10; --hu-tx:#f3d9a4;
+  --bot:#26374a; --screen:#0a1017; --scr-ln:#58c2cc; --desk:#44566b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f151d; --sf:#17202b; --ink:#e4eaf1; --mu:#98a5b6; --bd:#2d3a4b; --grid:#1e2936;
+  --ac:#58c2cc; --ac-soft:#12363a; --ac-tx:#b9e8ec;
+  --hu:#e0a84a; --hu-soft:#3a2c10; --hu-tx:#f3d9a4;
+  --bot:#26374a; --screen:#0a1017; --scr-ln:#58c2cc; --desk:#44566b; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);
+  padding-block:36px 72px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:1160px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+h1,h2,h3{margin:0;font-weight:600;line-height:1.2;text-wrap:balance}
+h1{font-size:2.1rem;letter-spacing:-.01em}
+h2{font-size:1.3rem}
+p{margin:0}
+.lede{font-size:1.08rem;max-width:64ch;margin-top:10px}
+.meta{color:var(--mu);font-size:.85rem;max-width:78ch;margin-top:10px}
+a{color:var(--ac)}
+code{font-family:var(--mono);font-size:.9em}
+
+/* Machine drawings */
+.sprite{position:absolute;width:0;height:0;overflow:hidden}
+.ln{stroke:var(--ink);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.thin{stroke-width:1.4}
+.bd{fill:var(--bot);stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.sk{fill:var(--ac-soft)}
+.sc{fill:var(--screen)}
+.tx{stroke:var(--scr-ln);stroke-width:1.8;fill:none;stroke-linecap:round}
+.cap{fill:var(--ac);stroke:var(--ink);stroke-width:1.5}
+.led{fill:var(--scr-ln)}
+.dk{fill:var(--desk);stroke:var(--ink);stroke-width:1.5}
+.wh{fill:var(--sf);stroke:var(--ink);stroke-width:2}
+.arm{fill:var(--hu);stroke:var(--ink);stroke-width:1.5}
+.stripe{stroke:var(--ink);stroke-width:1.5;fill:none}
+.stop{fill:var(--hu)}
+.pp{fill:var(--sf);stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.hm{fill:var(--ink)}
+
+/* Machine types */
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 14px;margin:0;padding:0;list-style:none}
+.legend li{display:flex;align-items:center;gap:8px;font-size:.85rem;min-width:0}
+.legend svg{width:38px;height:38px;flex:none}
+.legend b{display:block;font-weight:600}
+.legend span{color:var(--mu);font-size:.78rem;display:block}
+
+/* Decision floor */
+.top{background:var(--sf);border:2px solid var(--ink);border-radius:10px;padding:16px 18px;display:flex;gap:18px;align-items:center;flex-wrap:wrap;position:relative}
+.top svg{width:72px;height:72px;flex:none}
+.top .who{min-width:0;flex:1 1 220px}
+.top .tag{font:600 .72rem var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mu)}
+.top h2{margin-top:2px}
+.top ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px;flex:2 1 380px}
+.top li{background:var(--hu-soft);border:1px solid var(--hu);color:var(--hu-tx);border-radius:6px;padding:6px 10px;font-size:.88rem}
+.top::after{content:"↓  decisions go down to the rooms  ↓";position:absolute;left:50%;bottom:-27px;transform:translateX(-50%);font:.74rem var(--mono);color:var(--mu);white-space:nowrap}
+
+/* Rooms */
+.office{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px 40px;margin-top:4px}
+.room{position:relative;background:var(--sf);border:2px solid var(--ink);border-radius:10px;display:flex;flex-direction:column;min-width:0}
+.room>header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:12px 14px 10px;border-bottom:1px solid var(--bd)}
+.room .no{font:600 .82rem var(--mono);color:var(--sf);background:var(--ink);border-radius:4px;padding:1px 7px}
+.room h3{font-size:1.15rem}
+.room .sub{color:var(--mu);font-size:.85rem;flex:1 1 100%}
+.floor{flex:1;padding:14px 10px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:14px 6px;align-content:start;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:22px 22px}
+.unit{margin:0;display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0}
+.unit svg{width:60px;height:60px}
+.unit figcaption{font-size:.76rem;line-height:1.3;margin-top:3px;min-width:0;overflow-wrap:anywhere}
+.unit b{display:block;font-weight:600}
+.unit span{color:var(--mu);display:block}
+.room>footer{border-top:1px solid var(--bd);padding:10px 14px 12px;display:flex;flex-direction:column;gap:6px;font-size:.84rem}
+.out{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.out svg{width:22px;height:22px;flex:none}
+.out code{background:var(--ac-soft);color:var(--ac-tx);padding:1px 6px;border-radius:4px}
+.gate{border-radius:6px;padding:6px 9px}
+.gate b{font:600 .7rem var(--mono);letter-spacing:.06em;text-transform:uppercase;display:block}
+.gate.human{background:var(--hu-soft);border:1px solid var(--hu);color:var(--hu-tx)}
+.gate.agent{background:var(--ac-soft);border:1px solid var(--ac);color:var(--ac-tx)}
+.gate.auto{border:1px dashed var(--ink)}
+
+/* Direction between rooms */
+.room::after{position:absolute;font:600 1.15rem var(--mono);color:var(--ac);line-height:1}
+@media (min-width:901px){
+  .r1{grid-area:1/1}.r2{grid-area:1/2}.r3{grid-area:1/3}.r4{grid-area:2/3}.r5{grid-area:2/2}.r6{grid-area:2/1}
+  .r1::after,.r2::after{content:"→";right:-30px;top:50%;transform:translateY(-50%)}
+  .r3::after{content:"↓";bottom:-31px;left:50%;transform:translateX(-50%)}
+  .r4::after,.r5::after{content:"←";left:-30px;top:50%;transform:translateY(-50%)}
+  .r6::after{content:"↑";top:-31px;left:50%;transform:translateX(-50%)}
+}
+@media (max-width:900px){
+  .office{grid-template-columns:minmax(0,1fr)}
+  .room::after{content:"↓";bottom:-31px;left:50%;transform:translateX(-50%)}
+  .r6::after{content:"↺ back to the Plan room";font-size:.78rem;white-space:nowrap}
+}
+
+/* Roster */
+.wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:.9rem;background:var(--sf)}
+th,td{border:1px solid var(--bd);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--ac-soft);color:var(--ac-tx);font:600 .74rem var(--mono);letter-spacing:.05em;text-transform:uppercase}
+td:first-child{font-weight:600;white-space:nowrap}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+section.plan{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--bd);padding-top:26px;margin-top:8px}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.88rem;margin-top:16px}
+nav.toc a{text-decoration:none;border-bottom:1px solid var(--bd)}
+nav.toc a:hover{border-bottom-color:var(--ac)}
+a:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.dossier{display:flex;flex-direction:column;gap:12px;background:var(--sf);border:2px solid var(--ink);border-radius:10px;padding:18px 18px 20px;min-width:0}
+.dossier>header{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dossier .no{font:600 .82rem var(--mono);color:var(--sf);background:var(--ink);border-radius:4px;padding:1px 7px}
+.dossier h3{font-size:1.2rem}
+.dossier h4{margin:8px 0 0;font:600 .74rem var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--mu)}
+.dossier p{max-width:72ch}
+.kv{display:grid;grid-template-columns:9.5em minmax(0,1fr);gap:4px 14px;margin:0;font-size:.92rem}
+.kv dt{color:var(--mu)}
+.kv dd{margin:0;min-width:0}
+@media (max-width:560px){.kv{grid-template-columns:minmax(0,1fr)}.kv dt{margin-top:6px}}
+.dossier table code,.plan table code,.kv code,.steps code,pre{font-family:var(--mono)}
+.dossier td code,.plan td code,.kv code,.steps code{background:var(--ac-soft);color:var(--ac-tx);padding:1px 5px;border-radius:4px;font-size:.84em;overflow-wrap:anywhere}
+.steps{margin:0;padding-left:22px;max-width:72ch;display:flex;flex-direction:column;gap:5px;font-size:.94rem}
+.door{border-radius:8px;padding:10px 12px;font-size:.92rem;display:flex;flex-direction:column;gap:4px}
+.door b{font:600 .7rem var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.door.human{background:var(--hu-soft);border:1px solid var(--hu);color:var(--hu-tx)}
+.door.agent{background:var(--ac-soft);border:1px solid var(--ac);color:var(--ac-tx)}
+.door.auto{border:1px dashed var(--ink)}
+pre{background:var(--screen);color:var(--scr-ln);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:.82rem;line-height:1.5;margin:0}
+ul.plain{margin:0;padding-left:20px;max-width:72ch;display:flex;flex-direction:column;gap:6px;font-size:.94rem}
+
+/* Playbook section */
+.fig{margin:0;min-width:0}
+.fig .scroll{overflow-x:auto}
+.fig svg{display:block;width:100%;min-width:560px;height:auto}
+.fig figcaption{color:var(--mu);font-size:.85rem;margin-top:8px;max-width:78ch}
+.gbox{fill:var(--sf);stroke:var(--ink);stroke-width:1.5}
+.gdark{fill:var(--ink);stroke:var(--ink)}
+.gentry{fill:var(--hu-soft);stroke:var(--hu);stroke-width:1.5}
+.gcore{fill:var(--ac-soft);stroke:var(--ac);stroke-width:1.5}
+.gln{stroke:var(--ink);stroke-width:1.4;fill:none}
+.gdash{stroke-dasharray:4 4}
+.ghead{fill:var(--ink)}
+.gt{font-family:var(--mono);font-size:12.5px;fill:var(--ink)}
+.gtl{font-family:var(--mono);font-size:12.5px;fill:var(--sf)}
+.gs{font-family:var(--mono);font-size:10px;fill:var(--mu);letter-spacing:.06em}
+.three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.three li{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px 14px;font-size:.92rem;min-width:0}
+.three b{display:block;font-size:1rem;margin-bottom:2px}
+@media (max-width:760px){.three{grid-template-columns:minmax(0,1fr)}}
+</style>
+
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="b-agent" viewBox="0 0 80 80">
+    <line class="ln" x1="40" y1="8" x2="40" y2="14"/><circle class="cap" cx="40" cy="6" r="3"/>
+    <rect class="bd" x="21" y="14" width="38" height="26" rx="5"/><rect class="sc" x="25" y="18" width="30" height="18" rx="2"/>
+    <path class="tx" d="M29 23h16M29 27h10M29 31h13"/>
+    <rect class="bd" x="36" y="40" width="8" height="4"/><rect class="bd" x="25" y="44" width="30" height="17" rx="3"/>
+    <path class="ln" d="M25 49h-7v7M55 49h7v7"/>
+    <rect class="dk" x="5" y="60" width="70" height="5" rx="1.5"/><path class="ln" d="M11 65v11M69 65v11"/>
+  </symbol>
+  <symbol id="b-sub" viewBox="0 0 80 80">
+    <rect class="bd" x="26" y="18" width="28" height="20" rx="4"/><rect class="sc" x="29" y="21" width="22" height="14" rx="2"/>
+    <path class="tx" d="M32 26h12M32 30h8"/>
+    <rect class="bd" x="37" y="38" width="6" height="4"/><path class="bd" d="M29 42h22l4 21H25z"/>
+    <circle class="wh" cx="31" cy="68" r="5"/><circle class="wh" cx="49" cy="68" r="5"/>
+    <path class="ln" d="M8 75h64"/>
+  </symbol>
+  <symbol id="b-skill" viewBox="0 0 80 80">
+    <rect class="bd sk" x="24" y="14" width="32" height="48" rx="4"/><rect class="sc" x="28" y="19" width="24" height="12" rx="2"/>
+    <path class="tx" d="M31 23h14M31 27h9"/>
+    <path class="ln thin" d="M30 38h20M30 43h20"/><path class="ln thin" d="M32 52v8M38 52v8M44 52v8M50 52v8"/>
+    <rect class="dk" x="8" y="62" width="64" height="4" rx="1.5"/><path class="ln" d="M17 66l-4 9M63 66l4 9"/>
+  </symbol>
+  <symbol id="b-hook" viewBox="0 0 80 80">
+    <rect class="bd" x="12" y="18" width="18" height="57" rx="4"/><rect class="sc" x="16" y="23" width="10" height="10" rx="1.5"/>
+    <rect class="stop" x="19" y="26" width="4" height="4"/>
+    <rect class="arm" x="30" y="42" width="44" height="8" rx="4"/><path class="stripe" d="M40 42l-4 8M50 42l-4 8M60 42l-4 8M70 42l-4 8"/>
+    <path class="ln" d="M4 75h72"/>
+  </symbol>
+  <symbol id="b-mode" viewBox="0 0 80 80">
+    <rect class="bd" x="14" y="36" width="52" height="30" rx="4"/><rect class="sc" x="20" y="41" width="22" height="9" rx="2"/>
+    <path class="tx" d="M24 45.5h12"/><path class="ln thin" d="M40 58h20"/>
+    <path class="ln" d="M50 58L58 24"/><circle class="cap" cx="59" cy="21" r="5"/>
+    <path class="ln" d="M22 66v9M58 66v9"/>
+  </symbol>
+  <symbol id="b-rack" viewBox="0 0 80 80">
+    <rect class="bd" x="20" y="8" width="40" height="62" rx="4"/>
+    <rect class="sc" x="24" y="13" width="32" height="14" rx="2"/><path class="tx" d="M28 20h14"/><circle class="led" cx="50" cy="20" r="2.2"/>
+    <rect class="sc" x="24" y="31" width="32" height="14" rx="2"/><path class="tx" d="M28 38h10"/><circle class="led" cx="50" cy="38" r="2.2"/>
+    <rect class="sc" x="24" y="49" width="32" height="14" rx="2"/><path class="tx" d="M28 56h16"/><circle class="led" cx="50" cy="56" r="2.2"/>
+    <path class="ln" d="M27 70v5M53 70v5M8 75h64"/>
+  </symbol>
+  <symbol id="b-plug" viewBox="0 0 80 80">
+    <path class="ln" d="M20 40C8 40 14 68 4 68"/>
+    <rect class="bd" x="20" y="27" width="30" height="26" rx="5"/><path class="ln thin" d="M27 35h16M27 40h16M27 45h16"/>
+    <path class="ln" d="M50 33h14M50 40h14M50 47h14"/><rect class="bd" x="64" y="22" width="9" height="36" rx="2"/>
+  </symbol>
+  <symbol id="b-doc" viewBox="0 0 80 80">
+    <path class="pp" d="M22 10h26l12 12v48H22z"/><path class="ln" d="M48 10v12h12"/>
+    <path class="ln thin" d="M29 32h22M29 40h22M29 48h22M29 56h14"/>
+  </symbol>
+  <symbol id="b-human" viewBox="0 0 80 80">
+    <circle class="hm" cx="40" cy="22" r="11"/><path class="hm" d="M16 60c0-14 10-22 24-22s24 8 24 22z"/>
+    <rect class="dk" x="5" y="60" width="70" height="5" rx="1.5"/><path class="ln" d="M11 65v11M69 65v11"/>
+  </symbol>
+</svg>
+
+<main>
+<header>
+  <h1>Agent office</h1>
+  <p class="lede">The six stages of the playbook, drawn as the office of a one-person company. Each room is a stage. Agents sit at desks, skills stand on shelves, hooks wait at the doors. The human sits above the loop, on the decision floor.</p>
+  <p class="meta">Planning draft · 11 November 2026 · Based on <a href="https://claude.com/resources/articles/the-ai-native-sdlc-playbook">The AI-native SDLC playbook</a> by Louis Claxton, Anthropic. This page is an independent adaptation and is not published or endorsed by Anthropic. Running the seven roles as agents is this draft's interpretation: the playbook assigns those roles to people, and mentions a reviewing agent only as a confidence gate in the headless loop.</p>
+  <nav class="toc" aria-label="Sections">
+    <a href="#playbook">Playbook</a>
+    <a href="#ofis">Office</a>
+    <a href="#kadro">Roster</a>
+    <a href="#zincir">Order rule</a>
+    <a href="#koltuklar">Approval seats</a>
+    <a href="#oda-1">1 Plan</a>
+    <a href="#oda-2">2 Design</a>
+    <a href="#oda-3">3 Build</a>
+    <a href="#oda-4">4 Test</a>
+    <a href="#oda-5">5 Deploy</a>
+    <a href="#oda-6">6 Maintain</a>
+    <a href="#dosyalar">File tree</a>
+    <a href="#kurulum">Setup order</a>
+    <a href="#kaynak">Reference</a>
+  </nav>
+</header>
+
+
+<section class="plan" aria-labelledby="playbook">
+  <h2 id="playbook">The source it follows: The AI-native SDLC playbook</h2>
+  <p>This plugin does not invent a method; it installs a published one. The source is <a href="https://claude.com/resources/articles/the-ai-native-sdlc-playbook">The AI-native SDLC playbook</a>, in which Anthropic's Applied AI team collects the practices it uses with customers. It is not a formal standard; it is Anthropic's own published guide to running the software lifecycle with Claude Code.</p>
+  <ul class="three"><li><b>A known source</b>The six stages, the artifact chain and the gates come from the playbook; the table below shows which play each part rests on.</li><li><b>Ready to use</b>The playbook describes the method and shows short samples; it does not ship an installable package. This plugin provides one.</li><li><b>Fitted to one person</b>The playbook is written for large organizations. Approval seats let the same setup run in a one-person company.</li></ul>
+  <h3 style="margin-top:10px">From the line to the loop</h3>
+  <figure class="fig"><div class="scroll"><svg viewBox="0 0 640 344" role="img" aria-label="On the left, six stages stacked as a line; on the right, the same six stages as a loop around Claude."><text class="gs" x="30" y="16">TRADITIONAL: THE LINE</text><text class="gs" x="330" y="16">AI-NATIVE: THE LOOP</text><rect class="gbox" x="30" y="28" width="170" height="34" rx="5"/><text class="gt" x="115" y="50" text-anchor="middle">Plan</text><path class="gln" d="M115 63 v10"/><path class="ghead" d="M110 72 h10 l-5 7z"/><rect class="gbox" x="30" y="80" width="170" height="34" rx="5"/><text class="gt" x="115" y="102" text-anchor="middle">Design</text><path class="gln" d="M115 115 v10"/><path class="ghead" d="M110 124 h10 l-5 7z"/><rect class="gbox" x="30" y="132" width="170" height="34" rx="5"/><text class="gt" x="115" y="154" text-anchor="middle">Build</text><path class="gln" d="M115 167 v10"/><path class="ghead" d="M110 176 h10 l-5 7z"/><rect class="gbox" x="30" y="184" width="170" height="34" rx="5"/><text class="gt" x="115" y="206" text-anchor="middle">Test</text><path class="gln" d="M115 219 v10"/><path class="ghead" d="M110 228 h10 l-5 7z"/><rect class="gbox" x="30" y="236" width="170" height="34" rx="5"/><text class="gt" x="115" y="258" text-anchor="middle">Deploy</text><path class="gln" d="M115 271 v10"/><path class="ghead" d="M110 280 h10 l-5 7z"/><rect class="gbox" x="30" y="288" width="170" height="34" rx="5"/><text class="gt" x="115" y="310" text-anchor="middle">Maintain</text><circle class="gln gdash" cx="470" cy="186" r="118"/><path class="ghead" d="M-7 -6L7 0L-7 6z" transform="translate(529.0 83.8) rotate(30)"/><path class="ghead" d="M-7 -6L7 0L-7 6z" transform="translate(588.0 186.0) rotate(90)"/><path class="ghead" d="M-7 -6L7 0L-7 6z" transform="translate(529.0 288.2) rotate(150)"/><path class="ghead" d="M-7 -6L7 0L-7 6z" transform="translate(411.0 288.2) rotate(210)"/><path class="ghead" d="M-7 -6L7 0L-7 6z" transform="translate(352.0 186.0) rotate(270)"/><path class="ghead" d="M-7 -6L7 0L-7 6z" transform="translate(411.0 83.8) rotate(330)"/><circle class="gcore" cx="470" cy="186" r="46"/><text class="gt" x="470" y="190" text-anchor="middle">Claude</text><circle class="gdark" cx="470.0" cy="68.0" r="36"/><text class="gtl" x="470.0" y="72.0" text-anchor="middle">Plan</text><circle class="gdark" cx="572.2" cy="127.0" r="36"/><text class="gtl" x="572.2" y="131.0" text-anchor="middle">Design</text><circle class="gdark" cx="572.2" cy="245.0" r="36"/><text class="gtl" x="572.2" y="249.0" text-anchor="middle">Build</text><circle class="gdark" cx="470.0" cy="304.0" r="36"/><text class="gtl" x="470.0" y="308.0" text-anchor="middle">Test</text><circle class="gdark" cx="367.8" cy="245.0" r="36"/><text class="gtl" x="367.8" y="249.0" text-anchor="middle">Deploy</text><circle class="gdark" cx="367.8" cy="127.0" r="36"/><text class="gtl" x="367.8" y="131.0" text-anchor="middle">Maintain</text></svg></div><figcaption>This draft's drawing of the playbook's second figure. In the traditional process a loop back is a new release cycle. In the AI-native process the stages form a ring, AI works at each one, and people stay above the loop to start, direct and govern it.</figcaption></figure>
+  <h3 style="margin-top:10px">Setup dependencies</h3>
+  <figure class="fig"><div class="scroll"><svg viewBox="0 0 760 430" role="img" aria-label="Five entry points on top; Skills, Subagents and Evals in the second row; Requirements and design and PR review in the third; CI/CD in the fourth; Closing the loop at the bottom."><defs><marker id="ga" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ghead" d="M0 0L10 5L0 10z"/></marker></defs><path class="gln" d="M75 58L112 208" marker-end="url(#ga)"/><path class="gln" d="M225 58L190 112" marker-end="url(#ga)"/><path class="gln" d="M235 58L350 112" marker-end="url(#ga)"/><path class="gln" d="M245 58L500 112" marker-end="url(#ga)"/><path class="gln" d="M385 58L530 112" marker-end="url(#ga)"/><path class="gln gdash" d="M370 58L362 112" marker-end="url(#ga)"/><path class="gln" d="M185 150L155 208" marker-end="url(#ga)"/><path class="gln gdash" d="M250 140L458 222" marker-end="url(#ga)"/><path class="gln" d="M525 150V208" marker-end="url(#ga)"/><path class="gln" d="M525 246V298" marker-end="url(#ga)"/><path class="gln" d="M560 58C690 120 690 270 594 308" marker-end="url(#ga)"/><path class="gln" d="M525 336V388" marker-end="url(#ga)"/><path class="gln" d="M40 58C40 300 240 407 438 407" marker-end="url(#ga)"/><rect class="gentry" x="10" y="20" width="130" height="38" rx="5"/><text class="gs" x="19" y="34">PLAN</text><text class="gt" x="19" y="50">Capture intent</text><rect class="gentry" x="160" y="20" width="130" height="38" rx="5"/><text class="gs" x="169" y="34">BUILD</text><text class="gt" x="169" y="50">CLAUDE.md</text><rect class="gentry" x="310" y="20" width="130" height="38" rx="5"/><text class="gs" x="319" y="34">TEST</text><text class="gt" x="319" y="50">Feedback loop</text><rect class="gentry" x="460" y="20" width="130" height="38" rx="5"/><text class="gs" x="469" y="34">DEPLOY</text><text class="gt" x="469" y="50">Hooks</text><rect class="gentry" x="610" y="20" width="130" height="38" rx="5"/><text class="gs" x="619" y="34">BUILD</text><text class="gt" x="619" y="50">Plan mode</text><rect class="gbox" x="120" y="112" width="130" height="38" rx="5"/><text class="gs" x="129" y="126">BUILD</text><text class="gt" x="129" y="142">Skills</text><rect class="gbox" x="290" y="112" width="130" height="38" rx="5"/><text class="gs" x="299" y="126">BUILD</text><text class="gt" x="299" y="142">Subagents</text><rect class="gbox" x="460" y="112" width="130" height="38" rx="5"/><text class="gs" x="469" y="126">TEST</text><text class="gt" x="469" y="142">Evals</text><rect class="gbox" x="60" y="208" width="170" height="38" rx="5"/><text class="gs" x="69" y="222">DESIGN</text><text class="gt" x="69" y="238">Requirements & design</text><rect class="gbox" x="460" y="208" width="130" height="38" rx="5"/><text class="gs" x="469" y="222">DEPLOY</text><text class="gt" x="469" y="238">PR review</text><rect class="gbox" x="460" y="298" width="130" height="38" rx="5"/><text class="gs" x="469" y="312">DEPLOY</text><text class="gt" x="469" y="328">CI/CD</text><rect class="gbox" x="440" y="388" width="170" height="38" rx="5"/><text class="gs" x="449" y="402">MAINTAIN</text><text class="gt" x="449" y="418">Closing the loop</text></svg></div><figcaption>This draft's drawing of the playbook's dependency graph. Tinted boxes are entry points: they need nothing first. A solid arrow means "set this up before"; a dashed arrow means "helps, not required". The order of the stages is not the order of adoption.</figcaption></figure>
+  <h3 style="margin-top:10px">Where each play lives in this plugin</h3>
+  <div class="wrap"><table><tr><th>Stage</th><th>Play in the playbook</th><th>Its counterpart here</th></tr><tr><td>Plan</td><td>Capture as intent.md</td><td><code>/intent</code>, the intent template skill, the product owner agent</td></tr><tr><td>Design</td><td>Requirements and design</td><td><code>/spec</code>, the design agent, the policy skills, the spec job</td></tr><tr><td>Build</td><td>Claude Code plan mode as the default starting point</td><td><code>/plan</code>, the tech lead agent, the stage lock</td></tr><tr><td>Build</td><td>Claude Code on auto mode</td><td>Auto mode; turned on once the guardrails have matured</td></tr><tr><td>Build</td><td>The CLAUDE.md</td><td>A starter <code>CLAUDE.md</code> template</td></tr><tr><td>Build</td><td>Skills as institutional knowledge</td><td>Five skills, one rule each</td></tr><tr><td>Build</td><td>Hooks as build-time guardrails</td><td>Protected paths, format and lint, credential filter</td></tr><tr><td>Build</td><td>Parallel sessions and subagents</td><td>Three subagents; up to three parallel worktrees</td></tr><tr><td>Test</td><td>Give Claude a feedback loop</td><td>The verification block, the verifier, the test-file lock</td></tr><tr><td>Test</td><td>Continuous evals in CI</td><td>The eval suite and <code>agent-evals.yml</code></td></tr><tr><td>Deploy</td><td>AI in the PR review loop</td><td>The code owner agent, <code>REVIEW.md</code>, <code>/pr-babysit</code></td></tr><tr><td>Deploy</td><td>Hooks as approval gates</td><td>The production gate; approval seats</td></tr><tr><td>Deploy</td><td>CI/CD integration and deployment</td><td>The release pipeline, deploy tools, environment tiers</td></tr><tr><td>Maintain</td><td>Maintenance and closing the loop</td><td>The detection script, band config, the service owner agent</td></tr><tr><td>Maintain</td><td>Claude on call with Claude Tag</td><td>Out of scope; needs an enterprise Slack setup</td></tr></table></div>
+  <h3 style="margin-top:10px">The plugin's own sample files</h3>
+  <p class="meta" style="margin-top:0">The playbook shows a few-line sample for each play. The files below are not copies of those; they are the templates this plugin will ship, with section headings that follow the structure the playbook proposes. For the original samples, read the playbook.</p>
+  <p><code>intent/order-tracking/intent.md</code></p><pre># Intent: order tracking
+Author: A. Yilmaz (customer support). Status: draft.
+
+## Problem
+Customers call the support line to find out where their order is.
+The support team spends most of its day on these questions.
+
+## Proposed outcome
+A customer sees the order status, the next step and the estimated
+delivery day in their account.
+
+## Affected users and systems
+Customers, the support team, the order service, the carrier integration.
+
+## Constraints
+No new personal data is collected. Existing sign-in only.
+
+## Open questions
+Can people who ordered as guests track their order too?</pre>
+  <p><code>CLAUDE.md</code></p><pre># Order service
+
+## Commands
+- Build: make build
+- Test: make test (unit), make itest (integration, needs docker)
+- Lint: make lint (also runs in CI; fix before pushing)
+
+## Conventions
+- Money amounts are always integers in minor units.
+- Every endpoint has an integration test.
+- Dates are stored in UTC and converted only in the interface.
+
+## Architecture
+- api/ receives requests, core/ holds business rules,
+  adapters/ talks to outside systems.
+- Event schemas live in schemas/; generated files are never hand-edited.
+
+## Verifying your work
+Run all three commands and show the output. If a test fails, fix the
+code, not the test.
+
+## Things Claude gets wrong
+- Do not bump dependency versions; that is opened as its own task.
+- The legacy/ package is frozen; changes go under current/.</pre>
+  <p><code>.claude/skills/secure-api/SKILL.md</code></p><pre>---
+name: secure-api
+description: Applies the API security rule. Use when adding or changing
+  an external-facing endpoint and when reviewing API code.
+---
+# Secure API
+
+When you add or change an endpoint:
+1. Authentication: no anonymous route outside /health.
+2. Input validation: validate the body against the schema and reject
+   unknown fields.
+3. Audit trail: every state-changing call records who, what, which
+   record and when.
+4. Data class: a field marked as personal data in the schema never
+   reaches a log or an error message.
+
+Run scripts/check-endpoints.sh and include its output in your summary.</pre>
+</section>
+
+<section aria-label="Machine types">
+  <ul class="legend">
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><div><b>Agent</b><span>works at its desk</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-sub"/></svg><div><b>Subagent</b><span>called for one job</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-skill"/></svg><div><b>Skill</b><span>on the shelf, advises</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><div><b>Hook</b><span>at the door, blocks</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-mode"/></svg><div><b>Mode</b><span>sets how work runs</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><div><b>Script and CI job</b><span>same result every time</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-plug"/></svg><div><b>Connector</b><span>reaches an outside tool</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg><div><b>Document</b><span>passes room to room</span></div></li>
+    <li><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-human"/></svg><div><b>Human</b><span>decides</span></div></li>
+  </ul>
+</section>
+
+<section class="top" aria-label="Decision floor">
+  <svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-human"/></svg>
+  <div class="who"><div class="tag">Decision floor · above the loop</div><h2>You</h2></div>
+  <ul>
+    <li>You own all seven approval seats</li>
+    <li>You hold a seat yourself or leave it to its role agent</li>
+    <li>Production release authority always stays with you</li>
+  </ul>
+</section>
+
+<section class="office" id="ofis" aria-label="Six rooms">
+
+  <article class="room r1">
+    <header><span class="no">1</span><h3>Plan</h3><p class="sub">The intake room. An idea is written in its owner's words and enters the repo.</p></header>
+    <div class="floor">
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Product owner agent</b><span>questions the idea</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-skill"/></svg><figcaption><b>Intent template</b><span>skill</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-plug"/></svg><figcaption><b>GitHub</b><span>commits the file</span></figcaption></figure>
+    </div>
+    <footer>
+      <div class="out"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg>Output <code>intent.md</code></div>
+      <div class="gate human"><b>Gate · product owner seat</b>Whoever holds the seat accepts the intent. Default: human.</div>
+    </footer>
+  </article>
+
+  <article class="room r2">
+    <header><span class="no">2</span><h3>Design</h3><p class="sub">The design room. Requirements and design are written in one session.</p></header>
+    <div class="floor">
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Design agent</b><span>writes the spec</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Product owner agent</b><span>does it match the intent</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Policy owner agent</b><span>flags conflicts</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-skill"/></svg><figcaption><b>Security</b><span>skill</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-skill"/></svg><figcaption><b>Compliance</b><span>skill</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-skill"/></svg><figcaption><b>Brand and UX</b><span>skill</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><figcaption><b>Spec job</b><span>runs when intent merges</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Stage lock</b><span>shut until intent is accepted</span></figcaption></figure>
+    </div>
+    <footer>
+      <div class="out"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg>Output <code>spec.md</code></div>
+      <div class="gate human"><b>Gate · product owner and policy owner seats</b>The product owner accepts the spec. The policy owner steps in only when a conflict is flagged.</div>
+    </footer>
+  </article>
+
+  <article class="room r3">
+    <header><span class="no">3</span><h3>Build</h3><p class="sub">The workshop. No code is written without an accepted plan.</p></header>
+    <div class="floor">
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-mode"/></svg><figcaption><b>Plan mode</b><span>no edits before approval</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-mode"/></svg><figcaption><b>Auto mode</b><span>once guardrails mature</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Coding agent ×3</b><span>separate worktrees</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Tech lead agent</b><span>reviews the plan</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-sub"/></svg><figcaption><b>Researcher</b><span>reads code, reports back</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-sub"/></svg><figcaption><b>Simplifier</b><span>strips excess</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg><figcaption><b>CLAUDE.md</b><span>project rules</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-skill"/></svg><figcaption><b>Institutional knowledge</b><span>skill</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Protected paths</b><span>hook</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Format and lint</b><span>hook</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Credential filter</b><span>hook</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Stage lock</b><span>shut until spec is accepted</span></figcaption></figure>
+    </div>
+    <footer>
+      <div class="out"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg>Output <code>plan.md</code>, then code</div>
+      <div class="gate agent"><b>Gate · tech lead seat</b>Plan mode holds the door; the seat accepts the plan. Default: human only when flagged.</div>
+    </footer>
+  </article>
+
+  <article class="room r4">
+    <header><span class="no">4</span><h3>Test</h3><p class="sub">The test bench. Every session checks its own work before a person sees it.</p></header>
+    <div class="floor">
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><figcaption><b>Feedback loop</b><span>test, build, lint</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-sub"/></svg><figcaption><b>Verifier</b><span>runs the app</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Test-file lock</b><span>hook</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><figcaption><b>Eval suite</b><span>runs when config changes</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Platform engineer agent</b><span>maintains evals and hooks</span></figcaption></figure>
+    </div>
+    <footer>
+      <div class="out"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg>Output test output and eval results</div>
+      <div class="gate auto"><b>Gate · automatic, platform engineer seat</b>No merge until tests and evals pass. If the pass rate drops, the seat looks at it.</div>
+    </footer>
+  </article>
+
+  <article class="room r5">
+    <header><span class="no">5</span><h3>Deploy</h3><p class="sub">Dispatch. The agent does everything up to the production gate and nothing past it.</p></header>
+    <div class="floor">
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Code owner agent</b><span>reviews the PR against spec and plan</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg><figcaption><b>REVIEW.md</b><span>review rules</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Release manager agent</b><span>checklist and rollback drill</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><figcaption><b>PR review job</b><span>runs on every PR</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><figcaption><b>CI/CD pipeline</b><span>agent runs headless</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-plug"/></svg><figcaption><b>Deploy tools</b><span>deploy, status, rollback</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-hook"/></svg><figcaption><b>Production gate</b><span>blocks without authorization</span></figcaption></figure>
+    </div>
+    <footer>
+      <div class="out"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg>Output PR and review findings</div>
+      <div class="gate human"><b>Gate · code owner and release manager seats</b>The code owner approves the merge. Production release authority is always human. The authoring agent cannot approve its own code.</div>
+    </footer>
+  </article>
+
+  <article class="room r6">
+    <header><span class="no">6</span><h3>Maintain</h3><p class="sub">The watch room. A finding in production returns to the start as a new intent.</p></header>
+    <div class="floor">
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-rack"/></svg><figcaption><b>Detection script</b><span>measures the band, no model</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg><figcaption><b>Band config</b><span>log, diagnose, propose</span></figcaption></figure>
+      <figure class="unit"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-agent"/></svg><figcaption><b>Service owner agent</b><span>triages, writes the intent</span></figcaption></figure>
+    </div>
+    <footer>
+      <div class="out"><svg viewBox="0 0 80 80" aria-hidden="true"><use href="#b-doc"/></svg>Output incident record and a new <code>intent.md</code></div>
+      <div class="gate auto"><b>Gate · automatic, service owner seat</b>The tier sets what the agent may do. The seat triages the finding.</div>
+    </footer>
+  </article>
+</section>
+
+<section class="plan" aria-labelledby="kadro">
+  <h2 id="kadro">Office roster</h2>
+  <p class="meta" style="margin-top:0">The parts to build under this draft. Counts come from the machines in the drawing and will change as planning moves on.</p>
+  <div class="wrap"><table>
+    <tr><th>Type</th><th>Count</th><th>Which</th></tr>
+    <tr><td>Role agent</td><td class="n">7</td><td>Product owner, policy owner, tech lead, code owner, platform engineer, release manager, service owner</td></tr>
+    <tr><td>Working agent</td><td class="n">2</td><td>Design agent, coding agent (up to three copies at once)</td></tr>
+    <tr><td>Subagent</td><td class="n">3</td><td>Researcher, simplifier, verifier</td></tr>
+    <tr><td>Skill</td><td class="n">5</td><td>Intent template, security, compliance, brand and UX, institutional knowledge</td></tr>
+    <tr><td>Hook</td><td class="n">6</td><td>Stage lock, protected paths, format and lint, credential filter, test-file lock, production gate</td></tr>
+    <tr><td>Mode</td><td class="n">2</td><td>Plan mode, auto mode</td></tr>
+    <tr><td>Script and CI job</td><td class="n">7</td><td>Stage check, spec job, feedback loop, eval suite, PR review job, CI/CD pipeline, detection script</td></tr>
+    <tr><td>Connector</td><td class="n">2</td><td>GitHub, deploy tools</td></tr>
+    <tr><td>Document</td><td class="n">7</td><td><code>intent.md</code>, <code>spec.md</code>, <code>plan.md</code>, <code>CLAUDE.md</code>, <code>REVIEW.md</code>, band config, seat config</td></tr>
+    <tr><td>Command</td><td class="n">4</td><td><code>/intent</code>, <code>/spec</code>, <code>/plan</code>, <code>/pr-babysit</code></td></tr>
+    <tr><td>Approval seat</td><td class="n">7</td><td>One per role; who sits in it comes from config</td></tr>
+  </table></div>
+  <p class="meta">Left out: managed settings and the first responder in an incident channel. Both need an enterprise setup and have no counterpart in a one-person company. File and command names are proposals; the playbook itself names only <code>intent.md</code>, <code>spec.md</code>, <code>plan.md</code>, <code>CLAUDE.md</code>, <code>REVIEW.md</code> and a few sample paths.</p>
+</section>
+
+<section class="plan" aria-labelledby="zincir">
+  <h2 id="zincir">Order rule: one finishes before the next starts</h2>
+  <p>Each room ends with a document and the next room starts by reading it. The next door does not open until that document is accepted. Three layers hold the rule; if one is skipped, another catches it.</p>
+  <div class="wrap"><table>
+    <tr><th>Layer</th><th>Where it runs</th><th>What it does</th></tr>
+    <tr><td>Stage lock (hook)</td><td>Inside the agent, before every file write</td><td>Looks at which room the file belongs to. If the previous room's document is not accepted, it blocks the write and says why</td></tr>
+    <tr><td>Stage check (CI)</td><td>On every PR</td><td>A PR that brings <code>spec.md</code> needs an accepted <code>intent.md</code>; a PR that brings code needs an accepted <code>spec.md</code> and <code>plan.md</code>. Otherwise the merge is stopped</td></tr>
+    <tr><td>Branch protection</td><td>On GitHub</td><td>Only approved PRs reach the main branch. "Accepted" means the document is on main</td></tr>
+  </table></div>
+  <div class="wrap"><table>
+    <tr><th>Transition</th><th>What opens it</th><th>Where it returns if it stays shut</th></tr>
+    <tr><td>Plan → Design</td><td><code>intent.md</code> merges to main</td><td>Back to the originator with questions</td></tr>
+    <tr><td>Design → Build</td><td><code>spec.md</code> merges to main</td><td>To the design agent; to Plan if the intent is incomplete</td></tr>
+    <tr><td>Inside Build</td><td><code>plan.md</code> is accepted</td><td>The plan is revised; to Design if the spec is incomplete</td></tr>
+    <tr><td>Build → Test</td><td>The coding agent reports done</td><td>Stays with the coding agent until tests pass</td></tr>
+    <tr><td>Test → Deploy</td><td>Tests and evals pass, a PR opens</td><td>To the coding agent</td></tr>
+    <tr><td>Deploy → production</td><td>The code owner merges, the release manager authorizes</td><td>To Build; to Design if the spec was wrong</td></tr>
+    <tr><td>Maintain → Plan</td><td>A band is breached or a new item arrives</td><td>Every new item enters the chain at Plan</td></tr>
+  </table></div>
+</section>
+
+<section class="plan" aria-labelledby="koltuklar">
+  <h2 id="koltuklar">Approval seats</h2>
+  <p>Each of the seven roles has an approval seat. Who sits in it comes from one config file. One person can hold all seven; as the team grows, seats are handed over and the setup stays the same.</p>
+  <div class="wrap"><table>
+    <tr><th>Seat</th><th>What it approves</th><th>Default setting</th></tr>
+    <tr><td>Product owner</td><td>Acceptance of the intent and the spec</td><td>Human</td></tr>
+    <tr><td>Policy owner</td><td>Security and compliance conflicts flagged in the spec or the PR</td><td>Human only when flagged</td></tr>
+    <tr><td>Tech lead</td><td>The plan; the spec for higher-risk work</td><td>Human only when flagged</td></tr>
+    <tr><td>Platform engineer</td><td>Changes to the rules file, skills and hooks; eval results</td><td>Human only when flagged</td></tr>
+    <tr><td>Code owner</td><td>Merging a PR to main</td><td>Human</td></tr>
+    <tr><td>Release manager</td><td>Production release</td><td>Human; cannot be changed</td></tr>
+    <tr><td>Service owner</td><td>A monitoring finding: fix now, schedule or dismiss</td><td>Human only when flagged</td></tr>
+  </table></div>
+  <div class="wrap"><table>
+    <tr><th>Setting</th><th>What happens</th></tr>
+    <tr><td>Human</td><td>The role agent does the first pass and writes its findings; the named person approves</td></tr>
+    <tr><td>Human only when flagged</td><td>The role agent passes the work if it finds nothing, and escalates to the person if it does</td></tr>
+    <tr><td>Agent</td><td>The role agent approves</td></tr>
+  </table></div>
+  <ul class="plain">
+    <li><b>The author cannot approve.</b> The agent that produced a piece of work cannot sit in the seat that approves it. This is not configurable.</li>
+    <li><b>Production release is always human.</b> The release manager seat cannot be set to "agent".</li>
+    <li><b>A check stands behind every role agent.</b> An agent's approval is advisory; what enforces the rule is the hook, the CI check and branch protection.</li>
+  </ul>
+  <pre>// sdlc/seats.json
+{
+  "product-owner":     { "person": "you", "setting": "human" },
+  "policy-owner":      { "person": "you", "setting": "human-when-flagged" },
+  "tech-lead":         { "person": "you", "setting": "human-when-flagged" },
+  "platform-engineer": { "person": "you", "setting": "human-when-flagged" },
+  "code-owner":        { "person": "you", "setting": "human" },
+  "release-manager":   { "person": "you", "setting": "human", "locked": true },
+  "service-owner":     { "person": "you", "setting": "human-when-flagged" }
+}</pre>
+</section>
+
+<section class="plan" aria-label="Room files">
+  <h2>Room files</h2>
+  <p>Everything each room needs: who works there, which files are set up, how the gate is held, how the work runs, and how it is measured.</p>
+
+  <article class="dossier" id="oda-1">
+    <header><span class="no">1</span><h3>Plan</h3></header>
+    <dl class="kv">
+      <dt>Purpose</dt><dd>An idea is written once, in its owner's words, and becomes a document the next room can read.</dd>
+      <dt>Input</dt><dd>A person's idea, a filed ticket, or a finding from the Maintain room</dd>
+      <dt>Output</dt><dd><code>intent/&lt;name&gt;/intent.md</code></dd>
+      <dt>Prerequisite</dt><dd>None. The chain can start here.</dd>
+    </dl>
+    <h4>Roster and files</h4>
+    <div class="wrap"><table>
+      <tr><th>Part</th><th>Type</th><th>Job</th><th>File</th></tr>
+      <tr><td>Product owner agent</td><td>Role agent</td><td>Asks what an analyst would ask: scope, users, constraints, what success looks like. Checks the document against the template</td><td><code>.claude/agents/product-owner.md</code></td></tr>
+      <tr><td>Intent template</td><td>Skill</td><td>Defines the document's five sections</td><td><code>.claude/skills/intent-template/SKILL.md</code></td></tr>
+      <tr><td><code>/intent</code></td><td>Command</td><td>Starts the conversation and writes the document at the end</td><td><code>.claude/commands/intent.md</code></td></tr>
+      <tr><td>GitHub</td><td>Connector</td><td>Commits the document as a PR on behalf of an originator who does not use git</td><td>Account setting</td></tr>
+    </table></div>
+    <h4>Sections of the document</h4>
+    <p>Problem · Proposed outcome · Affected users and systems · Constraints · Open questions. The heading carries the author and the status.</p>
+    <h4>Gate</h4>
+    <div class="door human"><b>Product owner seat · default human</b><span>Condition: all five sections are filled and the originator has corrected any misunderstanding.</span><span>Enforced by: branch protection; the document reaches main only through an approved PR.</span><span>If it fails: back to the originator with questions.</span></div>
+    <h4>How the work runs</h4>
+    <ol class="steps">
+      <li>The originator describes the problem in their own words; no formal language is needed.</li>
+      <li>The product owner agent asks questions until the idea is concrete.</li>
+      <li>The agent writes the result as <code>intent.md</code> from the template.</li>
+      <li>The originator corrects anything that was misunderstood.</li>
+      <li>The document opens as a PR; the seat accepts or rejects it.</li>
+    </ol>
+    <h4>Measurement</h4>
+    <dl class="kv">
+      <dt>Leading</dt><dd>Time from first conversation to a committed document</dd>
+      <dt>Lagging</dt><dd>Share of intents accepted; number of changes to the intent after the spec is written</dd>
+    </dl>
+  </article>
+
+  <article class="dossier" id="oda-2">
+    <header><span class="no">2</span><h3>Design</h3></header>
+    <dl class="kv">
+      <dt>Purpose</dt><dd>Requirements and design are written in one session. Policy is applied while the spec is written rather than found in a review weeks later.</dd>
+      <dt>Input</dt><dd>An accepted <code>intent.md</code></dd>
+      <dt>Output</dt><dd><code>intent/&lt;name&gt;/spec.md</code>, next to the intent</dd>
+      <dt>Prerequisite</dt><dd>The Plan room and the policy skills</dd>
+    </dl>
+    <h4>Roster and files</h4>
+    <div class="wrap"><table>
+      <tr><th>Part</th><th>Type</th><th>Job</th><th>File</th></tr>
+      <tr><td>Design agent</td><td>Working agent</td><td>Writes the requirements and design spec from the intent; states clearly where it cannot satisfy conflicting policies</td><td><code>.claude/agents/designer.md</code></td></tr>
+      <tr><td>Product owner agent</td><td>Role agent</td><td>Checks that the spec solves the stated problem and that the intent's open questions are answered or carried forward</td><td><code>.claude/agents/product-owner.md</code></td></tr>
+      <tr><td>Policy owner agent</td><td>Role agent</td><td>Lists the flagged conflicts so each can be resolved with the owner of that policy</td><td><code>.claude/agents/policy-owner.md</code></td></tr>
+      <tr><td>Security, compliance, brand and UX</td><td>Skill</td><td>The policies the spec has to follow</td><td><code>.claude/skills/security/</code>, <code>compliance/</code>, <code>brand-ux/</code></td></tr>
+      <tr><td><code>/spec</code></td><td>Command</td><td>Points at the intent, names the constraints, demands flagged concerns</td><td><code>.claude/commands/spec.md</code></td></tr>
+      <tr><td>Spec job</td><td>CI job</td><td>Runs headless when the intent merges to main and opens the spec as a PR</td><td><code>.github/workflows/spec.yml</code></td></tr>
+      <tr><td>Stage lock</td><td>Hook</td><td>Blocks writing <code>spec.md</code> before the intent is accepted</td><td><code>.claude/hooks/stage-lock.sh</code></td></tr>
+    </table></div>
+    <h4>Sections of the document</h4>
+    <p>Requirements · Design · Flagged concerns · Open questions carried from the intent. For interface work a mock is prepared separately and linked from the spec.</p>
+    <h4>Gate</h4>
+    <div class="door human"><b>Product owner seat · default human</b><span>Condition: the spec meets the intent and every flagged concern is resolved.</span><span>The policy owner seat steps in only when a concern is flagged; the tech lead seat only for higher-risk work.</span><span>Enforced by: branch protection and the stage check. Accepting the spec is what starts plan mode in the Build room.</span><span>If it fails: back to the design agent; to the Plan room if the intent is incomplete.</span></div>
+    <h4>How the work runs</h4>
+    <ol class="steps">
+      <li>At first <code>/spec</code> is run by hand; once the routine holds, the job starts by itself when the intent merges.</li>
+      <li>The design agent writes the spec with the skills loaded.</li>
+      <li>Flagged concerns are worked through first; they are the points an analyst would have escalated.</li>
+      <li>The spec is committed next to the intent. The pair records what was asked for and what was decided.</li>
+      <li>The seat decides whether the spec moves on to Build.</li>
+    </ol>
+    <h4>Measurement</h4>
+    <dl class="kv">
+      <dt>Leading</dt><dd>Time between the intent commit and the spec commit</dd>
+      <dt>Lagging</dt><dd>Number of changes to the spec after the plan is written</dd>
+    </dl>
+  </article>
+
+  <article class="dossier" id="oda-3">
+    <header><span class="no">3</span><h3>Build</h3></header>
+    <dl class="kv">
+      <dt>Purpose</dt><dd>Nothing is implemented without an accepted plan. Institutional knowledge becomes files the agent reads; guardrails run as code rather than as habits.</dd>
+      <dt>Input</dt><dd>An accepted <code>spec.md</code> and <code>intent.md</code></dd>
+      <dt>Output</dt><dd><code>intent/&lt;name&gt;/plan.md</code>, then code and tests</dd>
+      <dt>Prerequisite</dt><dd>The rules file. Plan mode and hooks can be set up with nothing first.</dd>
+    </dl>
+    <h4>Roster and files</h4>
+    <div class="wrap"><table>
+      <tr><th>Part</th><th>Type</th><th>Job</th><th>File</th></tr>
+      <tr><td>Plan mode</td><td>Mode</td><td>The agent reads the codebase but cannot change it; edits open once the plan is accepted</td><td>Built in</td></tr>
+      <tr><td>Auto mode</td><td>Mode</td><td>After the plan is accepted, applies each change without a per-edit prompt. Turned on only once the rules file, skills, hooks and tests have matured</td><td>Built in</td></tr>
+      <tr><td>Coding agent</td><td>Working agent</td><td>Writes the plan and implements it after acceptance. At most three copies at once, each in its own worktree</td><td>Main session</td></tr>
+      <tr><td>Tech lead agent</td><td>Role agent</td><td>Interrogates the plan: what could break, which step is riskiest, which options were ruled out</td><td><code>.claude/agents/tech-lead.md</code></td></tr>
+      <tr><td>Researcher</td><td>Subagent</td><td>Explores the codebase and reports back without flooding the main context</td><td><code>.claude/agents/researcher.md</code></td></tr>
+      <tr><td>Simplifier</td><td>Subagent</td><td>Strips needless complexity once the work is done</td><td><code>.claude/agents/simplifier.md</code></td></tr>
+      <tr><td>Rules file</td><td>Document</td><td>Commands, conventions, architecture, frequent mistakes. Kept under a page</td><td><code>CLAUDE.md</code></td></tr>
+      <tr><td>Institutional knowledge</td><td>Skill</td><td>One rule that must be applied consistently; for example secure API design</td><td><code>.claude/skills/secure-api/SKILL.md</code></td></tr>
+      <tr><td><code>/plan</code></td><td>Command</td><td>Starts the session in plan mode with the spec and the intent</td><td><code>.claude/commands/plan.md</code></td></tr>
+      <tr><td>Stage lock</td><td>Hook</td><td>Blocks writing <code>plan.md</code> before the spec is accepted, and code before the plan is accepted</td><td><code>.claude/hooks/stage-lock.sh</code></td></tr>
+      <tr><td>Protected paths</td><td>Hook</td><td>Generated classes and frozen packages stay untouched</td><td><code>.claude/hooks/protected-paths.sh</code></td></tr>
+      <tr><td>Format and lint</td><td>Hook</td><td>Runs after each file edit, on that file only</td><td><code>.claude/hooks/format-lint.sh</code></td></tr>
+      <tr><td>Credential filter</td><td>Hook</td><td>Keeps secrets out of the diff</td><td><code>.claude/hooks/credential-filter.sh</code></td></tr>
+      <tr><td>Hook registry</td><td>Setting</td><td>Which hook runs before or after which tool</td><td><code>.claude/settings.json</code></td></tr>
+    </table></div>
+    <h4>Sections of the document</h4>
+    <p>Files that change · Order of work · Risks · Proof (which test, which screenshot). The bar: an engineer who never saw the conversation could implement from the plan alone.</p>
+    <h4>Gate</h4>
+    <div class="door agent"><b>Tech lead seat · default human only when flagged</b><span>Condition: the plan names the files, the order and the tests that prove it.</span><span>Enforced by: plan mode, which blocks file edits before acceptance; the stage check, which looks for <code>plan.md</code> in any PR that brings code.</span><span>If it fails: the plan is revised; back to the Design room if the spec is incomplete.</span></div>
+    <h4>How the work runs</h4>
+    <ol class="steps">
+      <li>The coding agent starts in plan mode with the intent and the spec.</li>
+      <li>It writes a plan naming the files that change, the order of work and the tests that prove it.</li>
+      <li>The tech lead agent interrogates the plan; it is revised until it is clear enough.</li>
+      <li>The accepted plan is committed as <code>plan.md</code>.</li>
+      <li>The coding agent implements. If the work departs from the plan, the plan is updated in the same commit.</li>
+      <li>Work that touches different files runs in parallel worktrees; work that shares files runs in one session, one after another.</li>
+      <li>When the agent makes the same mistake twice, the correction goes into the rules file.</li>
+    </ol>
+    <h4>Measurement</h4>
+    <dl class="kv">
+      <dt>Leading</dt><dd>Share of changes that merge from the first implementation pass; time from plan acceptance to merge</dd>
+      <dt>Lagging</dt><dd>Rework cycles per change; how often the merged diff still matches the plan</dd>
+    </dl>
+  </article>
+
+  <article class="dossier" id="oda-4">
+    <header><span class="no">4</span><h3>Test</h3></header>
+    <dl class="kv">
+      <dt>Purpose</dt><dd>Every session checks its own work before a person sees it. The configuration that steers the agent is regression-tested like the code it writes.</dd>
+      <dt>Input</dt><dd>Code and the proof items in <code>plan.md</code></dd>
+      <dt>Output</dt><dd>Test output, build log, eval results</dd>
+      <dt>Prerequisite</dt><dd>The feedback loop needs nothing first. The eval suite needs the rules file and the loop.</dd>
+    </dl>
+    <h4>Roster and files</h4>
+    <div class="wrap"><table>
+      <tr><th>Part</th><th>Type</th><th>Job</th><th>File</th></tr>
+      <tr><td>Feedback loop</td><td>Script</td><td>One command each for test, build and lint; exits non-zero on failure</td><td><code>Makefile</code> or <code>package.json</code></td></tr>
+      <tr><td>Verification block</td><td>Document</td><td>Lists the commands with an example of healthy output; the rule to run them and show the output before reporting done</td><td><code>CLAUDE.md</code></td></tr>
+      <tr><td>Verifier</td><td>Subagent</td><td>In a fresh context, runs the app and exercises the changed behavior and its two nearest flows; reports only, fixes nothing</td><td><code>.claude/agents/verifier.md</code></td></tr>
+      <tr><td>Test-file lock</td><td>Hook</td><td>Stops the agent editing test files during a fix task</td><td><code>.claude/hooks/test-lock.sh</code></td></tr>
+      <tr><td>Eval suite</td><td>CI job</td><td>Twenty to fifty real tasks. Runs nightly and whenever the rules file, a skill or a hook changes</td><td><code>evals/*.json</code>, <code>evals/check.sh</code>, <code>.github/workflows/agent-evals.yml</code></td></tr>
+      <tr><td>Platform engineer agent</td><td>Role agent</td><td>Investigates a drop in the eval pass rate; maintains the hooks and the loop</td><td><code>.claude/agents/platform-engineer.md</code></td></tr>
+    </table></div>
+    <h4>Gate</h4>
+    <div class="door auto"><b>Automatic · platform engineer seat, human only when flagged</b><span>Condition: tests, build and lint pass; the eval pass rate has not fallen below the threshold.</span><span>Enforced by: a CI merge check.</span><span>If it fails: back to the coding agent. If a configuration change lowered the pass rate, that change does not merge.</span></div>
+    <h4>How the work runs</h4>
+    <ol class="steps">
+      <li>The target is written so it can be checked: "these tests pass", "the screenshot matches the mock".</li>
+      <li>For a bug fix, the failing test is written and committed first; the agent then fixes the code without editing the test.</li>
+      <li>For interface work the agent implements, takes a screenshot, compares it with the mock and adjusts.</li>
+      <li>Before reporting done, the agent runs the three commands and shows the output.</li>
+      <li>The verifier does the final check in a fresh context.</li>
+      <li>Every production incident is added to the suite as a permanent eval.</li>
+    </ol>
+    <h4>Measurement</h4>
+    <dl class="kv">
+      <dt>Leading</dt><dd>First-pass CI success rate for agent-written changes; the eval pass rate over time</dd>
+      <dt>Lagging</dt><dd>Review time per PR; regressions caught in CI against those found in production</dd>
+    </dl>
+  </article>
+
+  <article class="dossier" id="oda-5">
+    <header><span class="no">5</span><h3>Deploy</h3></header>
+    <dl class="kv">
+      <dt>Purpose</dt><dd>Review runs in both directions and governance is enforced as the agent acts. The agent does everything up to the production gate and nothing past it.</dd>
+      <dt>Input</dt><dd>Code that passed its tests, <code>spec.md</code>, <code>plan.md</code></dd>
+      <dt>Output</dt><dd>A PR with review findings; a production release</dd>
+      <dt>Prerequisite</dt><dd>The rules file. The CI/CD pipeline needs PR review and the production gate.</dd>
+    </dl>
+    <h4>Roster and files</h4>
+    <div class="wrap"><table>
+      <tr><th>Part</th><th>Type</th><th>Job</th><th>File</th></tr>
+      <tr><td>Code owner agent</td><td>Role agent</td><td>Reviews every PR in three passes: bugs, security, compliance with the spec and the plan. It is not the agent that wrote the code</td><td><code>.claude/agents/code-owner.md</code></td></tr>
+      <tr><td>Review rules</td><td>Document</td><td>The passes, what counts as important, the cap on nits (five per review), what not to report</td><td><code>REVIEW.md</code></td></tr>
+      <tr><td>PR review job</td><td>CI job</td><td>Runs the code owner agent on every PR and writes findings ranked by severity</td><td><code>.github/workflows/pr-review.yml</code></td></tr>
+      <tr><td><code>/pr-babysit</code></td><td>Command</td><td>Sweeps unresolved comments and failing checks, fixes them, and continues until the PR waits only on approval</td><td><code>.claude/commands/pr-babysit.md</code></td></tr>
+      <tr><td>Release manager agent</td><td>Role agent</td><td>Fills in the release checklist, confirms the rollback was rehearsed, prepares the release</td><td><code>.claude/agents/release-manager.md</code></td></tr>
+      <tr><td>CI/CD pipeline</td><td>CI job</td><td>Read-only jobs first: triage a failed build, draft the changelog. Then write steps behind the gates</td><td><code>.github/workflows/release.yml</code></td></tr>
+      <tr><td>Deploy tools</td><td>Connector</td><td>Deploy, status and rollback, scoped per environment</td><td><code>.mcp.json</code></td></tr>
+      <tr><td>Production gate</td><td>Hook</td><td>Blocks a command that deploys to production when there is no authorization; states the reason and the route to approval</td><td><code>.claude/hooks/production-gate.sh</code></td></tr>
+      <tr><td>Branch protection</td><td>GitHub setting</td><td>No direct path to main; code owner approval required</td><td>Repo setting, <code>CODEOWNERS</code></td></tr>
+    </table></div>
+    <h4>Environment tiers</h4>
+    <p>In development the agent deploys freely. Staging sits in between. In production the agent only prepares the release; the release manager seat authorizes it.</p>
+    <h4>Gate</h4>
+    <div class="door human"><b>Code owner seat · default human</b><span>Condition: findings are addressed; the change does what the plan intended and the risk is acceptable.</span><span>Enforced by: branch protection. Findings do not approve or block on their own.</span><span>If it fails: back to the Build room; to the Design room if the spec was wrong.</span></div>
+    <div class="door human"><b>Release manager seat · human, cannot be changed</b><span>Condition: the checklist is complete and the rollback was rehearsed in staging.</span><span>Enforced by: the production gate hook.</span><span>If it fails: the release waits; an unhealthy release is rolled back with one command.</span></div>
+    <h4>How the work runs</h4>
+    <ol class="steps">
+      <li>When a PR opens, the review job runs and writes findings ranked by severity.</li>
+      <li>When the agent is tagged on a comment, it makes the fix and pushes it; request and change stay on record in the PR.</li>
+      <li>When review flags the same mistake a second time, the correction goes into the rules file.</li>
+      <li>The seat merges; the merged PR triggers the pipeline.</li>
+      <li>The agent prepares the release; production opens on authorization.</li>
+      <li>Once a month the findings are rated and the nit cap and excluded paths are tuned.</li>
+    </ol>
+    <h4>Measurement</h4>
+    <dl class="kv">
+      <dt>Leading</dt><dd>Time to first review; share of comments resolved without a person touching the branch; time spent waiting at each gate</dd>
+      <dt>Lagging</dt><dd>Defects caught before merge against those escaping to production; deployment frequency, change failure rate and time to restore</dd>
+    </dl>
+  </article>
+
+  <article class="dossier" id="oda-6">
+    <header><span class="no">6</span><h3>Maintain</h3></header>
+    <dl class="kv">
+      <dt>Purpose</dt><dd>The loop closes. A trigger invokes the agent with no person in the path, and what it finds re-enters the chain as a new intent.</dd>
+      <dt>Input</dt><dd>Production metrics, tickets, scheduled checks</dd>
+      <dt>Output</dt><dd>An incident record and a new <code>intent.md</code></dd>
+      <dt>Prerequisite</dt><dd>The Plan room, PR review, hooks and a rehearsed rollback</dd>
+    </dl>
+    <h4>Roster and files</h4>
+    <div class="wrap"><table>
+      <tr><th>Part</th><th>Type</th><th>Job</th><th>File</th></tr>
+      <tr><td>Detection script</td><td>Script</td><td>Computes the rolling mean and deviation of one metric and catches slow drift as well as spikes. No model inside; it has unit tests</td><td><code>ops/detect.py</code></td></tr>
+      <tr><td>Band config</td><td>Document</td><td>Three tiers: at the first band only log, at the second the agent diagnoses read-only, at the third it may open a PR or trigger a pre-approved rollback</td><td><code>ops/bands.yaml</code></td></tr>
+      <tr><td>Monitoring job</td><td>CI job</td><td>Runs the script on a schedule and invokes the agent headless when a band is breached</td><td><code>.github/workflows/monitor.yml</code></td></tr>
+      <tr><td>Service owner agent</td><td>Role agent</td><td>Writes the diagnosis in intent form: the anomaly and its evidence, a proposed outcome, affected systems, open questions. Triages the queue</td><td><code>.claude/agents/service-owner.md</code></td></tr>
+    </table></div>
+    <h4>Gate</h4>
+    <div class="door auto"><b>Automatic · service owner seat, human only when flagged</b><span>Condition: the tier sets what the agent may do; the agent touches production only through gated routes.</span><span>Enforced by: version-controlled band config and permissions. In the headless chain an independent confidence gate stands between rooms: either a deterministic check or a role agent.</span><span>The seat decides for each finding: fix now, schedule or dismiss. Dismissals tune the bands.</span></div>
+    <h4>How the work runs</h4>
+    <ol class="steps">
+      <li>One metric with a stable baseline is chosen: CI test failure rate, post-deploy error rate or PR cycle time.</li>
+      <li>The script watches the metric and acts by tier when a band is breached.</li>
+      <li>The service owner agent writes the diagnosis as <code>intent.md</code>; the finding enters the chain at the Plan room.</li>
+      <li>A small, well-bounded fix arrives directly as a PR at the review gate.</li>
+      <li>When the fix ships, an eval is added for the incident.</li>
+    </ol>
+    <h4>Measurement</h4>
+    <dl class="kv">
+      <dt>Leading</dt><dd>Time from band breach to an intent in the queue</dd>
+      <dt>Lagging</dt><dd>Share of findings that become merged fixes; repeat incidents of the same class</dd>
+    </dl>
+  </article>
+</section>
+
+<section class="plan" aria-labelledby="dosyalar">
+  <h2 id="dosyalar">File tree</h2>
+  <p>The files that sit in the project repo once setup is done. Names are proposals.</p>
+  <pre>project/
+├─ CLAUDE.md                      rules file
+├─ REVIEW.md                      review rules
+├─ CODEOWNERS                     code owner seat
+├─ .mcp.json                      deploy tools
+├─ intent/
+│  └─ &lt;name&gt;/
+│     ├─ intent.md                1 Plan
+│     ├─ spec.md                  2 Design
+│     └─ plan.md                  3 Build
+├─ sdlc/
+│  └─ seats.json                  approval seats
+├─ .claude/
+│  ├─ settings.json               hook registry
+│  ├─ agents/
+│  │  ├─ product-owner.md         role agents (7)
+│  │  ├─ policy-owner.md
+│  │  ├─ tech-lead.md
+│  │  ├─ platform-engineer.md
+│  │  ├─ code-owner.md
+│  │  ├─ release-manager.md
+│  │  ├─ service-owner.md
+│  │  ├─ designer.md              working agent
+│  │  ├─ researcher.md            subagents (3)
+│  │  ├─ simplifier.md
+│  │  └─ verifier.md
+│  ├─ skills/
+│  │  ├─ intent-template/SKILL.md
+│  │  ├─ security/SKILL.md
+│  │  ├─ compliance/SKILL.md
+│  │  ├─ brand-ux/SKILL.md
+│  │  └─ secure-api/SKILL.md
+│  ├─ commands/
+│  │  ├─ intent.md  spec.md  plan.md  pr-babysit.md
+│  └─ hooks/
+│     ├─ stage-lock.sh
+│     ├─ protected-paths.sh
+│     ├─ format-lint.sh
+│     ├─ credential-filter.sh
+│     ├─ test-lock.sh
+│     └─ production-gate.sh
+├─ evals/
+│  ├─ *.json                      20-50 real tasks
+│  └─ check.sh
+├─ ops/
+│  ├─ detect.py                   detection script
+│  └─ bands.yaml                  band config
+└─ .github/workflows/
+   ├─ stage-check.yml
+   ├─ spec.yml
+   ├─ agent-evals.yml
+   ├─ pr-review.yml
+   ├─ release.yml
+   └─ monitor.yml</pre>
+</section>
+
+<section class="plan" aria-labelledby="kurulum">
+  <h2 id="kurulum">Setup order</h2>
+  <p>The order of the rooms is not the order of setup. Following the playbook's dependency graph, five parts can be set up with nothing first and the rest build on them. Each step is run by hand at first; the self-running loop is the last stage.</p>
+  <div class="wrap"><table>
+    <tr><th>Order</th><th>What is set up</th><th>What it depends on</th></tr>
+    <tr><td>1</td><td>Rules file, plan mode, feedback loop, hooks, intent capture</td><td>Nothing; all five are entry points</td></tr>
+    <tr><td>2</td><td>Skills, subagents</td><td>Rules file</td></tr>
+    <tr><td>3</td><td>Requirements and design</td><td>Intent capture, skills</td></tr>
+    <tr><td>4</td><td>Eval suite</td><td>Rules file, feedback loop</td></tr>
+    <tr><td>5</td><td>PR review</td><td>Rules file; skills help</td></tr>
+    <tr><td>6</td><td>CI/CD pipeline</td><td>PR review, hooks</td></tr>
+    <tr><td>7</td><td>Closing the loop</td><td>Intent capture, PR review, hooks, CI/CD pipeline</td></tr>
+  </table></div>
+  <p class="meta">Three things cannot be set up from files alone: branch protection is turned on in GitHub settings, the API key for CI is added to the repo secrets, and an end-to-end run on a real PR needs a session with write access.</p>
+</section>
+
+<section class="plan" aria-labelledby="kaynak">
+  <h2 id="kaynak">Reference</h2>
+  <p>Louis Claxton, <a href="https://claude.com/resources/articles/the-ai-native-sdlc-playbook">The AI-native SDLC playbook</a>, Anthropic, 21 August 2026.</p>
+  <ul class="plain">
+    <li><b>Taken from the playbook:</b> the six stages; the artifact chain (<code>intent.md</code>, <code>spec.md</code>, <code>plan.md</code>, the PR with its findings, the incident record); plan mode and auto mode; the rules file, skills, hooks, subagents and worktrees; the feedback loop and continuous evals; PR review with <code>REVIEW.md</code>; the production gate; control bands and the loop back to a new intent; the dependency graph behind the setup order; the leading and lagging indicators.</li>
+    <li><b>Added in this draft:</b> the seven roles as agents with configurable approval seats; a separate design agent; the stage lock hook and stage check; the proposed file and command names.</li>
+    <li><b>Left out:</b> managed settings, Claude Tag, the legacy-system source-of-truth sidebar and Claude Design.</li>
+  </ul>
+  <p class="meta">All wording on this page is the draft's own. For the original text, samples and figures, read the playbook.</p>
+</section>
+</main>
+
+</body>
+</html>
