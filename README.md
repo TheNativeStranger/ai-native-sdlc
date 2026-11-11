@@ -4,9 +4,9 @@ A Claude Code plugin that runs a software lifecycle as six rooms in one office. 
 
 Based on [The AI-native SDLC playbook](https://claude.com/resources/articles/the-ai-native-sdlc-playbook) by Louis Claxton, Anthropic. This project is an independent implementation and is not published or endorsed by Anthropic. Running the seven roles as agents is this project's interpretation: the playbook assigns those roles to people, and mentions a reviewing agent only as a confidence gate in the headless loop.
 
-![The office: a decision floor above six rooms arranged as a loop](docs/img/office.png)
+![Left: six stages stacked as a line. Right: the same six stages as a loop around Claude](docs/img/line-and-loop.png)
 
-The drawing is the design this plugin implements. A browsable version with every room's file is in [`docs/agent-office.html`](docs/agent-office.html).
+From the line to the loop: this project's drawing of the playbook's second figure. In the traditional process a loop back is a new release cycle. In the AI-native process the stages form a ring, AI works at each one, and people stay above the loop to start, direct and govern it.
 
 ## Contents
 
@@ -32,12 +32,6 @@ This plugin does not invent a method; it installs a published one. The playbook 
 | **A known source** | The six stages, the artifact chain and the gates come from the playbook. The table below shows which play each part rests on. |
 | **Ready to use** | The playbook describes the method and shows short samples. It does not ship an installable package. This plugin provides one. |
 | **Fitted to one person** | The playbook is written for large organizations. Approval seats let the same setup run in a one-person company. |
-
-### From the line to the loop
-
-![Left: six stages stacked as a line. Right: the same six stages as a loop around Claude](docs/img/line-and-loop.png)
-
-This project's drawing of the playbook's second figure. In the traditional process a loop back is a new release cycle. In the AI-native process the stages form a ring, AI works at each one, and people stay above the loop to start, direct and govern it.
 
 ### Where each play lives in this plugin
 
@@ -88,6 +82,10 @@ Requirements: Claude Code with plugin support, Python 3.9 or later, git.
 Small, well-bounded fixes use a `fix/<name>` branch: they need an accepted plan but no intent or spec, and committed tests cannot be edited.
 
 ## Office roster
+
+![The office: a decision floor above six rooms arranged as a loop](docs/img/office.png)
+
+The drawing is the design this plugin implements. A browsable version with every room's file is in [`docs/agent-office.html`](docs/agent-office.html).
 
 | Type | Count | Which |
 |---|---|---|
